@@ -61,7 +61,7 @@ static struct cdev *my_cdev;
 static struct timer_info *tp = NULL;
 
 
-char start_stop[10];
+char start_stop[10] = "stop";
 
 
 static irqreturn_t xilaxitimer_isr(int irq,void*dev_id);
@@ -183,11 +183,6 @@ static void setup_and_start_timer(uint64_t seconds)
 	data = ioread32(tp->base_addr +  XIL_AXI_TIMER_TCSR_OFFSET);
 	iowrite32(data | XIL_AXI_TIMER_CSR_CASC_MASK,
 			tp->base_addr +  XIL_AXI_TIMER_TCSR_OFFSET);
-
-	// Start Timer bz setting enable signal
-	data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
-	iowrite32(data | XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK,
-			tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
 
 }
 
@@ -318,11 +313,31 @@ ssize_t timer_write(struct file *pfile, const char __user *buffer, size_t length
 	ret = sscanf(buff,"%d:%d:%d:%d",&dani,&sati,&min,&sek);
 	if(ret == 4)//two parameters parsed in sscanf
 	{
-
 		pom = dani*24*60*60 + sati*60*60 + min*60 + sek;
-		printk(KERN_INFO "POCINJE ODBROJAVANJE %d:%d:%d:%d",dani,sati,min,sek); 
+		printk(KERN_INFO "POCINJE ODBROJAVANJE %d:%d:%d:%d\n",dani,sati,min,sek); 
 		setup_and_start_timer(pom);
 
+	}
+
+	ret = sscanf(buff,"%s", &start_stop);
+    if(ret == 1)
+	{
+		if(!strcmp(start_stop,"start"))
+		{
+			data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+			iowrite32(data | XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK,
+					tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+			printk(KERN_INFO "Poceo je da broji\n");	
+		}
+		else if(!strcmp(start_stop,"stop"))
+		{
+		
+			data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+			iowrite32(data & ~(XIL_AXI_TIMER_CSR_ENABLE_TMR_MASK),
+					tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+
+			printk(KERN_INFO "Prestao je da broji\n");	
+		}
 	}
 	else
 	{
