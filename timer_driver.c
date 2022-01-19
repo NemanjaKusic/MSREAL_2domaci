@@ -24,6 +24,7 @@
 #define XIL_AXI_TIMER_TCR_OFFSET		0x8
 #define XIL_AXI_TIMER_TLR1_OFFSET		0x14
 #define XIL_AXI_TIMER_TCSR1_OFFSET	0x10
+#define XIL_AXI_TIMER_TCR1_OFFSET		0x18
 
 #define XIL_AXI_TIMER_CSR_CASC_MASK	0x00000800
 #define XIL_AXI_TIMER_CSR_ENABLE_ALL_MASK	0x00000400
@@ -62,7 +63,7 @@ static struct timer_info *tp = NULL;
 
 
 char start_stop[10] = "stop";
-
+int endRead = 0;
 
 static irqreturn_t xilaxitimer_isr(int irq,void*dev_id);
 static void setup_and_start_timer(uint64_t seconds);
@@ -135,7 +136,7 @@ static void setup_and_start_timer(uint64_t seconds)
 	uint64_t timer_load;
 	unsigned int zero = 0;
 	unsigned int data = 0;
-	timer_load = zero - seconds*100000000;
+	timer_load = seconds*100000000;
 	
 	uint32_t pom1;
 	uint32_t pom2;
@@ -183,6 +184,11 @@ static void setup_and_start_timer(uint64_t seconds)
 	data = ioread32(tp->base_addr +  XIL_AXI_TIMER_TCSR_OFFSET);
 	iowrite32(data | XIL_AXI_TIMER_CSR_CASC_MASK,
 			tp->base_addr +  XIL_AXI_TIMER_TCSR_OFFSET);
+
+	//setovan UDT0
+	data = ioread32(tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
+	iowrite32(data | XIL_AXI_TIMER_CSR_DOWN_COUNT_MASK,
+			tp->base_addr + XIL_AXI_TIMER_TCSR_OFFSET);
 
 }
 
@@ -293,16 +299,56 @@ int timer_close(struct inode *pinode, struct file *pfile)
 
 ssize_t timer_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset) 
 {
+	int dani,sati,minuti,sekunde;
 
-	//printk(KERN_INFO "Succesfully read timer\n");
-	return 0;
+	uint64_t buff1,buff2;
+	uint64_t ukupna;
+	uint64_t pomocna;
+
+	int ret;
+	char buff[BUFF_SIZE];
+	long int len;
+	if (endRead){
+		endRead = 0;
+		printk(KERN_INFO "Succesfully read from file\n");
+		return 0;
+	}
+
+	
+    buff1 = ioread32(tp->base_addr + XIL_AXI_TIMER_TCR_OFFSET);
+	buff2 = ioread32(tp->base_addr + XIL_AXI_TIMER_TCR1_OFFSET);
+	buff2 = buff2 << 32;
+	ukupna = buff2 | buff1;
+
+/*												ako ovo dodamo, insmod ne radi
+	dani = ukupna / (24*60*60*100000000);
+	pomocna =  ukupna % (24*60*60*100000000); 
+
+	sati = pomocna / (60*60*100000000);
+	pomocna = pomocna % (60*60*100000000);
+
+	minuti = pomocna / (60*100000000);
+	pomocna = pomocna % (60*100000000);
+	
+	sekunde = pomocna / 100000000;
+*/
+
+	len = scnprintf(buff, BUFF_SIZE, "%d:%d:%d:%d\n", dani,sati,minuti,sekunde);
+	ret = copy_to_user(buffer, buff, len);
+	if(ret)
+		return -EFAULT;
+		
+	endRead = 1;
+
+	return len;	
+	
 }
 
 ssize_t timer_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset) 
 {
 	char buff[BUFF_SIZE];
-	uint32_t data = 0;
 	uint64_t pom;
+	uint32_t data = 0;
 	int dani,sati,min,sek;
 	int ret = 0;
 	ret = copy_from_user(buff, buffer, length);
