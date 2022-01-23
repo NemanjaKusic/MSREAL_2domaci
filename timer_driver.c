@@ -17,6 +17,7 @@
 #include <linux/ioport.h>//ioremap
 
 #include <linux/interrupt.h> //irqreturn_t, request_irq
+#include <linux/math64.h>
 
 // REGISTER CONSTANTS
 #define XIL_AXI_TIMER_TCSR_OFFSET	0x0
@@ -331,7 +332,7 @@ ssize_t timer_read(struct file *pfile, char __user *buffer, size_t length, loff_
 	buff2 = buff2 << 32;
 	ukupna = buff2 | buff1;
 
-/*												ako ovo dodamo, insmod ne radi
+/*							ako ovo dodamo ne radi			
 	dani = ukupna / (24*60*60*100000000);
 	pomocna =  ukupna % (24*60*60*100000000); 
 
@@ -343,6 +344,19 @@ ssize_t timer_read(struct file *pfile, char __user *buffer, size_t length, loff_
 	
 	sekunde = pomocna / 100000000;
 */
+
+	pomocna = (int)div_u64(ukupna,100000*1000); //u sekundama
+	
+	dani = (int)div_u64(pomocna, 24*60*60);
+	pomocna = pomocna - dani * 24*60*60;
+
+	sati = (int)div_u64(pomocna, 60*60);
+	pomocna = pomocna - sati * 60*60;
+
+	minuti = (int)div_u64(pomocna, 60);
+	pomocna = pomocna - 60;
+
+	sekunde = (int)pomocna; 
 
 	len = scnprintf(buff, BUFF_SIZE, "%d:%d:%d:%d\n", dani,sati,minuti,sekunde);
 	ret = copy_to_user(buffer, buff, len);
