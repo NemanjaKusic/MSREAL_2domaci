@@ -354,7 +354,7 @@ ssize_t timer_read(struct file *pfile, char __user *buffer, size_t length, loff_
 	pomocna = pomocna - sati * 60*60;
 
 	minuti = (int)div_u64(pomocna, 60);
-	pomocna = pomocna - 60;
+	pomocna = pomocna - minuti*60;
 
 	sekunde = (int)pomocna; 
 
